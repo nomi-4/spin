@@ -73,7 +73,10 @@
 
     /* Spinner */
     .list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-    .pill{padding:8px 10px;border-radius:999px;background:#333744;border:1px solid rgba(255,255,255,.1)}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;background:#333744;border:1px solid rgba(255,255,255,.1)}
+    .pill.done{opacity:.65;text-decoration:line-through}
+    .pill .x{appearance:none;background:transparent;border:0;color:#b0b3c6;cursor:pointer;font-size:14px;line-height:1}
+    .pill .x:hover{color:#e5e7ef}
 
     .result{margin-top:10px;padding:12px;border-radius:12px;background:#1e2025;border:1px dashed rgba(255,255,255,.15);display:flex;align-items:center;gap:8px}
     .result.hidden{display:none}
@@ -130,7 +133,7 @@
       <div id="summaryWrap">
         <canvas id="summaryCanvas"></canvas>
         <div class="row" style="justify-content:space-between;margin-top:6px;color:var(--muted);font-size:12px">
-          <span>Last 30 days · mood (1–5)</span>
+          <span>Last 30 days · mood (1–5) + energy overlay</span>
           <span id="summaryStats"></span>
         </div>
       </div>
@@ -155,7 +158,7 @@
   </main>
 
   <footer>
-    Offline‑ready • Add to Home Screen in Safari • v1.1
+    Offline‑ready • Add to Home Screen in Safari • v1.2
   </footer>
 </div>
 
@@ -167,9 +170,9 @@ const LS_KEY = 'moodspin-v1';
 const load = () => { try { return JSON.parse(localStorage.getItem(LS_KEY))||{} } catch { return {} } };
 const save = s => localStorage.setItem(LS_KEY, JSON.stringify(s));
 
-// State shape: { entries:{[date]:{mood:number, energy:number, note:string}}, tasks:[string] }
+// State shape: { entries:{[date]:{mood:number, energy:number, note:string}}, tasks:[string], done:{[date]:{[taskIndex]:true}} }
 const EMOJI = ['😣','🙁','😐','🙂','😀']; // 1..5
-const ENERGY = ['Low','Med','High'];     // 1..3
+const ENERGY = ['1','2','3','4','5'];     // 1..5
 
 const moodRow = document.getElementById('moodRow');
 const energyRow = document.getElementById('energyRow');
@@ -179,7 +182,13 @@ const spinResult = document.getElementById('spinResult');
 const spinText = document.getElementById('spinText');
 const wheel = document.getElementById('wheel');
 
-function ensureState(){ const s=load(); s.entries=s.entries||{}; s.tasks=s.tasks||['Dishes','Tidy 5 min','Wipe counters','Water plants']; save(s); }
+function ensureState(){
+  const s=load();
+  s.entries = s.entries || {};
+  s.tasks   = s.tasks   || ['Dishes','Tidy 5 min','Wipe counters','Water plants'];
+  s.done    = s.done    || {}; // per-day map: { [YYYY-MM-DD]: { [taskIndex]: true } }
+  save(s);
+}
 
 function renderHeader(){ document.getElementById('today').textContent = fmtDate(); }
 
@@ -213,9 +222,34 @@ function renderHistory(){
 // Save button commits note too
 function saveToday(){ const s=load(); const d=todayKey(); const e=s.entries[d]||{}; e.note = noteEl.value.trim(); s.entries[d]=e; save(s); spinResult.classList.remove('hidden'); spinText.textContent='Saved ✓'; setTimeout(()=>{ spinResult.classList.add('hidden'); }, 1200); }
 
-// Spinner with animation
+// Spinner with animation and persistent daily strikes
 let spinTimer;
-function renderTasks(){ const s=load(); const list=document.getElementById('taskList'); list.innerHTML=''; s.tasks.forEach((t,idx)=>{ const p=document.createElement('span'); p.className='pill'; p.textContent=t; p.title='Tap to remove'; p.onclick=()=>{ s.tasks.splice(idx,1); save(s); renderTasks(); }; list.appendChild(p); }); }
+function renderTasks(){
+  const s=load();
+  const d=todayKey();
+  s.done[d] = s.done[d] || {};
+  const list=document.getElementById('taskList');
+  list.innerHTML='';
+  s.tasks.forEach((t,idx)=>{
+    const pill=document.createElement('span'); pill.className='pill';
+    if(s.done[d][idx]) pill.classList.add('done');
+    pill.innerHTML = `${t} <button aria-label="Remove task" data-idx="${idx}" class="x">×</button>`;
+    pill.addEventListener('click', (ev)=>{
+      if(ev.target.classList.contains('x')) return; // handled below
+      s.done[d][idx] = !s.done[d][idx];
+      save(s); renderTasks();
+    });
+    pill.querySelector('.x').addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      if(confirm('Remove this task from the list?')){
+        s.tasks.splice(idx,1);
+        Object.keys(s.done).forEach(day=>{ if(s.done[day]) delete s.done[day][idx]; });
+        save(s); renderTasks();
+      }
+    });
+    list.appendChild(pill);
+  });
+}
 function addTask(){ const inp=document.getElementById('newTask'); const v=inp.value.trim(); if(!v) return; const s=load(); s.tasks.push(v); save(s); inp.value=''; renderTasks(); }
 function spinTask(){ const s=load(); if(!s.tasks.length){ alert('Add a task first'); return; }
   // Start animation
@@ -235,7 +269,7 @@ function spinTask(){ const s=load(); if(!s.tasks.length){ alert('Add a task firs
 function shareTip(){ if(navigator.share){ navigator.share({title:'Mood & Spin', text:'Add to Home Screen for app‑like mode', url:location.href}); } else alert('In Safari, tap Share → Add to Home Screen'); }
 function wipe(){ if(confirm('Wipe all data?')){ localStorage.removeItem(LS_KEY); location.reload(); } }
 
-// 30‑day summary
+// 30‑day summary with mood color mapping + energy overlay
 const summaryBtn = document.getElementById('summaryBtn');
 const summaryWrap = document.getElementById('summaryWrap');
 const summaryCanvas = document.getElementById('summaryCanvas');
@@ -250,37 +284,65 @@ function drawSummary(){
   const dpr = window.devicePixelRatio || 1;
   const cssW = summaryCanvas.clientWidth || 300; const cssH = summaryCanvas.clientHeight || 90;
   summaryCanvas.width = Math.floor(cssW*dpr); summaryCanvas.height = Math.floor(cssH*dpr);
-  ctx.scale(dpr,dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,cssW,cssH);
 
   const days = [];
   for(let i=29;i>=0;i--){ const dt=new Date(); dt.setDate(dt.getDate()-i); const key=dt.toISOString().slice(0,10); days.push({key, dt, entry: s.entries[key]}); }
 
   // Stats
-  let sum=0, count=0, best=0;
-  days.forEach(d=>{ if(d.entry && d.entry.mood){ sum+=d.entry.mood; count++; best=Math.max(best,d.entry.mood); }});
+  let sum=0, count=0;
+  days.forEach(d=>{ if(d.entry && d.entry.mood){ sum+=d.entry.mood; count++; }});
   const avg = count? (sum/count).toFixed(2) : '-';
   summaryStats.textContent = `avg ${avg} • filled ${count}/30`;
 
-  // Draw bars
-  const pad = 6; const w = cssW - pad*2; const h = cssH - pad*2; const barW = w/30 - 2;
+  // Colors mapping (mood & energy use same scheme)
+  const colorFor = (v)=>{
+    if(!v) return '#3a3d46';
+    if(v<=2) return '#ef4444';      // red
+    if(v===3) return '#fbbf24';     // yellow
+    return '#22c55e';               // green
+  };
+
+  // Draw bars with overlay
+  const pad = 6; const w = cssW - pad*2; const h = cssH - pad*2; const gap = 2; const barW = (w/30) - gap;
   ctx.lineWidth = 1;
   days.forEach((d,idx)=>{
-    const x = pad + idx*(barW+2);
+    const x = pad + idx*(barW+gap);
     const mood = d.entry && d.entry.mood ? d.entry.mood : 0;
-    const ratio = mood/5; const barH = Math.max(2, h*ratio);
-    // background bar
+    const energy = d.entry && d.entry.energy ? d.entry.energy : 0;
+
+    // background track
     ctx.fillStyle = '#333744'; ctx.fillRect(x, pad, barW, h);
-    // value bar
-    let col = '#3a3d46';
-    if(mood===1) col = '#6b7280';
-    if(mood===2) col = getComputedStyle(document.documentElement).getPropertyValue('--lav-1').trim() || '#c4b5fd';
-    if(mood===3) col = getComputedStyle(document.documentElement).getPropertyValue('--lav-2').trim() || '#a78bfa';
-    if(mood===4) col = getComputedStyle(document.documentElement).getPropertyValue('--lav-3').trim() || '#8b5cf6';
-    if(mood===5) col = '#6d28d9';
-    ctx.fillStyle = col; ctx.fillRect(x, pad + (h-barH), barW, barH);
+
+    // mood bar
+    const mH = Math.max(2, h * (mood/5));
+    ctx.fillStyle = colorFor(mood);
+    ctx.fillRect(x, pad + (h - mH), barW, mH);
+
+    // energy overlay (thinner bar centered)
+    const eH = Math.max(2, h * (energy/5));
+    const eW = Math.max(2, barW * 0.5);
+    const ex = x + (barW - eW)/2;
+    ctx.fillStyle = colorFor(energy) + 'CC'; // add alpha
+    ctx.fillRect(ex, pad + (h - eH), eW, eH);
+
+    // subtle outline for readability
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.strokeRect(x+0.5, pad+0.5, barW-1, h-1);
   });
 }
+
+// Daily roll: reset strike-throughs for a new day
+(function dailyRoll(){
+  let last = todayKey();
+  setInterval(()=>{
+    const now = todayKey();
+    if(now!==last){
+      const s=load(); s.done[now] = s.done[now] || {}; save(s); last = now; renderTasks(); renderHeader(); renderHistory(); drawSummary();
+    }
+  }, 60*1000);
+})();
 
 // Init
 ensureState();
