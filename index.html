@@ -75,9 +75,21 @@
     .list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
     .pill{padding:8px 10px;border-radius:999px;background:#333744;border:1px solid rgba(255,255,255,.1)}
 
-    .result{margin-top:10px;padding:12px;border-radius:12px;background:#1e2025;border:1px dashed rgba(255,255,255,.15)}
+    .result{margin-top:10px;padding:12px;border-radius:12px;background:#1e2025;border:1px dashed rgba(255,255,255,.15);display:flex;align-items:center;gap:8px}
+    .result.hidden{display:none}
+
+    /* Spin animation */
+    #wheel{width:28px;height:28px;border-radius:50%;border:4px solid var(--lav-1);border-top-color:var(--lav-3);display:none}
+    .spinning #wheel{display:inline-block;animation:spin 0.9s linear infinite}
+    .spinning #spinBtn{pointer-events:none;opacity:.7}
+    @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 
     footer{background:var(--surface-2);padding:8px var(--pad) calc(env(safe-area-inset-bottom) + 8px);color:var(--muted);font-size:12px}
+
+    /* Summary section */
+    #summaryWrap{display:none;margin-top:10px}
+    #summaryWrap.open{display:block}
+    #summaryCanvas{width:100%;height:90px;display:block}
   </style>
 </head>
 <body>
@@ -97,24 +109,31 @@
     <section class="card" aria-labelledby="moodhdr">
       <div class="row between">
         <h2 id="moodhdr" style="margin:0;font-size:16px">Today · <span id="today"></span></h2>
-        <button id="saveBtn" class="primary">Save</button>
+        <div class="row">
+          <button id="summaryBtn" class="ghost" title="Show 30‑day summary">30‑day summary</button>
+          <button id="saveBtn" class="primary">Save</button>
+        </div>
       </div>
 
       <div style="height:8px"></div>
-      <div class="chip-row" id="moodRow" aria-label="Mood">
-        <!-- mood chips injected -->
-      </div>
+      <div class="chip-row" id="moodRow" aria-label="Mood"></div>
 
       <div style="height:8px"></div>
-      <div class="chip-row" id="energyRow" aria-label="Energy">
-        <!-- energy chips injected -->
-      </div>
+      <div class="chip-row" id="energyRow" aria-label="Energy"></div>
 
       <div style="height:8px"></div>
       <label for="note" class="sr-only">Note</label>
       <textarea id="note" placeholder="Add a quick note (optional)"></textarea>
 
       <div class="history" id="history" aria-label="Past 7 days"></div>
+
+      <div id="summaryWrap">
+        <canvas id="summaryCanvas"></canvas>
+        <div class="row" style="justify-content:space-between;margin-top:6px;color:var(--muted);font-size:12px">
+          <span>Last 30 days · mood (1–5)</span>
+          <span id="summaryStats"></span>
+        </div>
+      </div>
     </section>
 
     <!-- Spinner Card -->
@@ -128,12 +147,15 @@
         </div>
       </div>
       <div class="list" id="taskList"></div>
-      <div id="spinResult" class="result" style="display:none"></div>
+      <div id="spinResult" class="result hidden">
+        <div id="wheel"></div>
+        <div id="spinText"></div>
+      </div>
     </section>
   </main>
 
   <footer>
-    Offline‑ready • Add to Home Screen in Safari • v1.0
+    Offline‑ready • Add to Home Screen in Safari • v1.1
   </footer>
 </div>
 
@@ -154,6 +176,8 @@ const energyRow = document.getElementById('energyRow');
 const noteEl = document.getElementById('note');
 const historyEl = document.getElementById('history');
 const spinResult = document.getElementById('spinResult');
+const spinText = document.getElementById('spinText');
+const wheel = document.getElementById('wheel');
 
 function ensureState(){ const s=load(); s.entries=s.entries||{}; s.tasks=s.tasks||['Dishes','Tidy 5 min','Wipe counters','Water plants']; save(s); }
 
@@ -163,12 +187,12 @@ function renderMoodEnergy(){
   const s=load(); const d=todayKey(); const e=s.entries[d]||{};
   moodRow.innerHTML='';
   EMOJI.forEach((em,i)=>{
-    const b=document.createElement('button'); b.className='chip'+(e.mood===i+1?' active':''); b.textContent=em; b.onclick=()=>{ e.mood=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderHistory(); };
+    const b=document.createElement('button'); b.className='chip'+(e.mood===i+1?' active':''); b.textContent=em; b.onclick=()=>{ e.mood=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderHistory(); drawSummary(); };
     moodRow.appendChild(b);
   });
   energyRow.innerHTML='';
   ENERGY.forEach((lbl,i)=>{
-    const b=document.createElement('button'); b.className='chip'+(e.energy===i+1?' active':''); b.textContent='⚡ '+lbl; b.onclick=()=>{ e.energy=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderHistory(); };
+    const b=document.createElement('button'); b.className='chip'+(e.energy===i+1?' active':''); b.textContent='⚡ '+lbl; b.onclick=()=>{ e.energy=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderHistory(); drawSummary(); };
     energyRow.appendChild(b);
   });
   noteEl.value = e.note||'';
@@ -187,16 +211,76 @@ function renderHistory(){
 }
 
 // Save button commits note too
-function saveToday(){ const s=load(); const d=todayKey(); const e=s.entries[d]||{}; e.note = noteEl.value.trim(); s.entries[d]=e; save(s); spinResult.style.display='block'; spinResult.textContent='Saved ✓'; setTimeout(()=>{ spinResult.style.display='none'; }, 1200); }
+function saveToday(){ const s=load(); const d=todayKey(); const e=s.entries[d]||{}; e.note = noteEl.value.trim(); s.entries[d]=e; save(s); spinResult.classList.remove('hidden'); spinText.textContent='Saved ✓'; setTimeout(()=>{ spinResult.classList.add('hidden'); }, 1200); }
 
-// Spinner
+// Spinner with animation
+let spinTimer;
 function renderTasks(){ const s=load(); const list=document.getElementById('taskList'); list.innerHTML=''; s.tasks.forEach((t,idx)=>{ const p=document.createElement('span'); p.className='pill'; p.textContent=t; p.title='Tap to remove'; p.onclick=()=>{ s.tasks.splice(idx,1); save(s); renderTasks(); }; list.appendChild(p); }); }
 function addTask(){ const inp=document.getElementById('newTask'); const v=inp.value.trim(); if(!v) return; const s=load(); s.tasks.push(v); save(s); inp.value=''; renderTasks(); }
-function spinTask(){ const s=load(); if(!s.tasks.length){ alert('Add a task first'); return; } const pick = s.tasks[Math.floor(Math.random()*s.tasks.length)]; spinResult.style.display='block'; spinResult.innerHTML = `<strong>Do this now:</strong> ${pick}`; }
+function spinTask(){ const s=load(); if(!s.tasks.length){ alert('Add a task first'); return; }
+  // Start animation
+  document.body.classList.add('spinning');
+  spinResult.classList.remove('hidden');
+  let i=0; spinText.textContent='Spinning…';
+  spinTimer = setInterval(()=>{ const pick = s.tasks[i++ % s.tasks.length]; spinText.textContent = 'Spinning… ' + pick; }, 120);
+  setTimeout(()=>{
+    clearInterval(spinTimer);
+    const final = s.tasks[Math.floor(Math.random()*s.tasks.length)];
+    spinText.innerHTML = `<strong>Do this now:</strong> ${final}`;
+    document.body.classList.remove('spinning');
+  }, 1200);
+}
 
 // Share + Wipe
 function shareTip(){ if(navigator.share){ navigator.share({title:'Mood & Spin', text:'Add to Home Screen for app‑like mode', url:location.href}); } else alert('In Safari, tap Share → Add to Home Screen'); }
 function wipe(){ if(confirm('Wipe all data?')){ localStorage.removeItem(LS_KEY); location.reload(); } }
+
+// 30‑day summary
+const summaryBtn = document.getElementById('summaryBtn');
+const summaryWrap = document.getElementById('summaryWrap');
+const summaryCanvas = document.getElementById('summaryCanvas');
+const summaryStats = document.getElementById('summaryStats');
+
+function toggleSummary(){ summaryWrap.classList.toggle('open'); if(summaryWrap.classList.contains('open')){ drawSummary(); summaryBtn.textContent='Hide summary'; } else { summaryBtn.textContent='30‑day summary'; } }
+summaryBtn.addEventListener('click', toggleSummary);
+
+function drawSummary(){
+  const s=load();
+  const ctx = summaryCanvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = summaryCanvas.clientWidth || 300; const cssH = summaryCanvas.clientHeight || 90;
+  summaryCanvas.width = Math.floor(cssW*dpr); summaryCanvas.height = Math.floor(cssH*dpr);
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+
+  const days = [];
+  for(let i=29;i>=0;i--){ const dt=new Date(); dt.setDate(dt.getDate()-i); const key=dt.toISOString().slice(0,10); days.push({key, dt, entry: s.entries[key]}); }
+
+  // Stats
+  let sum=0, count=0, best=0;
+  days.forEach(d=>{ if(d.entry && d.entry.mood){ sum+=d.entry.mood; count++; best=Math.max(best,d.entry.mood); }});
+  const avg = count? (sum/count).toFixed(2) : '-';
+  summaryStats.textContent = `avg ${avg} • filled ${count}/30`;
+
+  // Draw bars
+  const pad = 6; const w = cssW - pad*2; const h = cssH - pad*2; const barW = w/30 - 2;
+  ctx.lineWidth = 1;
+  days.forEach((d,idx)=>{
+    const x = pad + idx*(barW+2);
+    const mood = d.entry && d.entry.mood ? d.entry.mood : 0;
+    const ratio = mood/5; const barH = Math.max(2, h*ratio);
+    // background bar
+    ctx.fillStyle = '#333744'; ctx.fillRect(x, pad, barW, h);
+    // value bar
+    let col = '#3a3d46';
+    if(mood===1) col = '#6b7280';
+    if(mood===2) col = getComputedStyle(document.documentElement).getPropertyValue('--lav-1').trim() || '#c4b5fd';
+    if(mood===3) col = getComputedStyle(document.documentElement).getPropertyValue('--lav-2').trim() || '#a78bfa';
+    if(mood===4) col = getComputedStyle(document.documentElement).getPropertyValue('--lav-3').trim() || '#8b5cf6';
+    if(mood===5) col = '#6d28d9';
+    ctx.fillStyle = col; ctx.fillRect(x, pad + (h-barH), barW, barH);
+  });
+}
 
 // Init
 ensureState();
