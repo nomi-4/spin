@@ -158,7 +158,7 @@
   </main>
 
   <footer>
-    Offline‑ready • Add to Home Screen in Safari • v1.2
+    Offline • Add to Home Screen in Safari • v1.3
   </footer>
 </div>
 
@@ -299,9 +299,9 @@ function drawSummary(){
   // Colors mapping (mood & energy use same scheme)
   const colorFor = (v)=>{
     if(!v) return '#3a3d46';
-    if(v<=2) return '#ef4444';      // red
-    if(v===3) return '#fbbf24';     // yellow
-    return '#22c55e';               // green
+    if(v<=2) return '#FCA5A5';      // light red
+    if(v===3) return '#FDE68A';     // light yellow
+    return '#86EFAC';               // light green
   };
 
   // Draw bars with overlay
