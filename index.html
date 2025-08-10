@@ -62,14 +62,6 @@
     /* Layout */
     .wrap{min-height:100dvh;display:grid;grid-template-rows:1fr auto}
 
-    header{position:sticky;top:0;z-index:20;
-      background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
-      -webkit-backdrop-filter: blur(10px) saturate(140%);
-      backdrop-filter: blur(10px) saturate(140%);
-      padding:calc(env(safe-area-inset-top) + 8px) var(--pad) 8px var(--pad);
-      border-bottom:1px solid var(--glass-stroke);
-    }
-
     /* Bottom nav */
     .bottombar{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;
       padding:8px var(--pad) calc(env(safe-area-inset-bottom) + 10px) var(--pad);
@@ -89,7 +81,7 @@
     .screen{position:absolute;inset:0;overflow:auto;padding:14px}
     .screen.hidden{display:none}
 
-    /* Glass panel feel, but full-bleed */
+    /* Glass panel feel, full-bleed */
     .panel{position:relative;border-radius:var(--radius);padding:18px;background:var(--glass);border:1px solid var(--glass-stroke);
       -webkit-backdrop-filter: blur(12px) saturate(160%);backdrop-filter: blur(12px) saturate(160%);
       box-shadow:0 20px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.02) inset;
@@ -100,11 +92,6 @@
     .chip-row{display:flex;gap:8px;flex-wrap:wrap}
     .chip{border:1px solid var(--glass-stroke);padding:8px 10px;border-radius:10px;cursor:pointer;background:rgba(255,255,255,.04)}
     .chip.active{outline:2px solid var(--neon-cyan);outline-offset:0; box-shadow:0 0 18px rgba(0,229,255,.25)}
-
-    /* 7-day history */
-    .history{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:12px}
-    .dot{height:16px;border-radius:6px;background:#242733;position:relative;overflow:hidden;border:1px solid var(--glass-stroke)}
-    .dot .inner{position:absolute;left:50%;transform:translateX(-50%);bottom:1px;width:5px;border-radius:4px;box-shadow:0 0 10px rgba(255,255,255,.2)}
 
     textarea{width:100%;min-height:76px;border-radius:10px;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.05);color:var(--fg);padding:10px;resize:vertical}
 
@@ -124,19 +111,17 @@
     .spinning #spinBtn{pointer-events:none;opacity:.7}
     @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 
-    /* Summary section */
-    #summaryWrap{display:none;margin-top:10px}
-    #summaryWrap.open{display:block}
-    #summaryCanvas{width:100%;height:120px;display:block}
-
-    /* Reduce motion */
-    @media (prefers-reduced-motion: reduce){ .spinning #wheel{animation:none} }
+    /* Calendar grids */
+    .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:12px}
+    .dow{font-size:11px;color:var(--muted);text-align:center}
+    .cell{position:relative;aspect-ratio:1/1;border-radius:10px;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.04);overflow:hidden}
+    .cell .day{position:absolute;top:6px;left:6px;font-size:11px;color:var(--muted)}
+    .cell .energy{position:absolute;right:4px;bottom:4px;width:6px;border-radius:4px}
+    .cell .count{position:absolute;inset:0;display:grid;place-items:center;font-weight:700}
   </style>
 </head>
 <body>
 <div class="wrap">
-  
-
   <main>
     <!-- Mood Screen -->
     <section id="moodTab" class="screen">
@@ -144,7 +129,6 @@
         <div class="row between">
           <h2 id="moodhdr">Today · <span id="today"></span></h2>
           <div class="row">
-            <button id="summaryBtn" class="ghost" title="Show 30‑day summary">30‑day</button>
             <button id="saveBtn" class="primary">Save</button>
           </div>
         </div>
@@ -159,15 +143,13 @@
         <label for="note" class="sr-only">Note</label>
         <textarea id="note" placeholder="Add a quick note (optional)"></textarea>
 
-        <div class="history" id="history" aria-label="Past 7 days"></div>
-
-        <div id="summaryWrap">
-          <canvas id="summaryCanvas"></canvas>
-          <div class="row" style="justify-content:space-between;margin-top:6px;color:var(--muted);font-size:12px">
-            <span>Last 30 days · mood (dark) + energy (light)</span>
-            <span id="summaryStats"></span>
-          </div>
+        <!-- 30‑day calendar summary for mood+energy -->
+        <div style="height:10px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px">
+          <span>Last 30 days · calendar</span>
+          <span id="moodCalStats"></span>
         </div>
+        <div id="moodCal" class="calendar" aria-label="Last 30 days mood calendar"></div>
       </div>
     </section>
 
@@ -187,6 +169,14 @@
           <div id="wheel"></div>
           <div id="spinText"></div>
         </div>
+
+        <!-- 30‑day calendar summary for completed tasks -->
+        <div style="height:14px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px">
+          <span>Last 30 days · tasks done</span>
+          <span id="taskCalStats"></span>
+        </div>
+        <div id="taskCal" class="calendar" aria-label="Last 30 days tasks calendar"></div>
       </div>
     </section>
   </main>
@@ -233,7 +223,7 @@ const ENERGY = ['1','2','3','4','5'];     // 1..5
 const moodRow = document.getElementById('moodRow');
 const energyRow = document.getElementById('energyRow');
 const noteEl = document.getElementById('note');
-const historyEl = document.getElementById('history');
+
 const spinResult = document.getElementById('spinResult');
 const spinText = document.getElementById('spinText');
 
@@ -266,39 +256,19 @@ function renderMoodEnergy(){
   const s=load(); const d=todayKey(); const e=s.entries[d]||{};
   moodRow.innerHTML='';
   EMOJI.forEach((em,i)=>{
-    const b=document.createElement('button'); b.className='chip'+(e.mood===i+1?' active':''); b.textContent=em; b.onclick=()=>{ e.mood=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderHistory(); drawSummary(); };
+    const b=document.createElement('button'); b.className='chip'+(e.mood===i+1?' active':''); b.textContent=em; b.onclick=()=>{ e.mood=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderMoodCalendar(); };
     moodRow.appendChild(b);
   });
   energyRow.innerHTML='';
   ENERGY.forEach((lbl,i)=>{
-    const b=document.createElement('button'); b.className='chip'+(e.energy===i+1?' active':''); b.textContent='⚡ '+lbl; b.onclick=()=>{ e.energy=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderHistory(); drawSummary(); };
+    const b=document.createElement('button'); b.className='chip'+(e.energy===i+1?' active':''); b.textContent='⚡ '+lbl; b.onclick=()=>{ e.energy=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderMoodCalendar(); };
     energyRow.appendChild(b);
   });
   noteEl.value = e.note||'';
 }
 
-function renderHistory(){
-  const s=load(); historyEl.innerHTML='';
-  for(let i=6;i>=0;i--){
-    const dt=new Date(); dt.setDate(dt.getDate()-i); const key=dt.toISOString().slice(0,10);
-    const e=s.entries[key]||{};
-    const dot=document.createElement('div'); dot.className='dot';
-    // Mood as background color
-    dot.style.background = moodColor(e.mood);
-    // Energy as thin center bar with proportional height
-    const inner=document.createElement('span'); inner.className='inner';
-    inner.style.background = energyColor(e.energy);
-    const h = 14 * ((e.energy||0)/5); // 0..14px
-    inner.style.height = Math.max(2, Math.round(h)) + 'px';
-    dot.appendChild(inner);
-
-    dot.title = `${dt.toDateString()} • Mood ${e.mood||'-'} • Energy ${e.energy||'-'}`;
-    historyEl.appendChild(dot);
-  }
-}
-
 // Save button commits note too
-function saveToday(){ const s=load(); const d=todayKey(); const e=s.entries[d]||{}; e.note = noteEl.value.trim(); s.entries[d]=e; save(s); spinResult.classList.remove('hidden'); spinText.textContent='Saved ✓'; setTimeout(()=>{ spinResult.classList.add('hidden'); }, 1200); }
+function saveToday(){ const s=load(); const d=todayKey(); const e=s.entries[d]||{}; e.note = noteEl.value.trim(); s.entries[d]=e; save(s); if(spinResult){ spinResult.classList.remove('hidden'); spinText.textContent='Saved ✓'; setTimeout(()=>{ spinResult.classList.add('hidden'); }, 1200); } }
 
 // Spinner with animation and persistent daily strikes
 let spinTimer;
@@ -315,14 +285,14 @@ function renderTasks(){
     pill.addEventListener('click', (ev)=>{
       if(ev.target.classList.contains('x')) return; // handled below
       s.done[d][idx] = !s.done[d][idx];
-      save(s); renderTasks();
+      save(s); renderTasks(); renderTaskCalendar();
     });
     pill.querySelector('.x').addEventListener('click', (ev)=>{
       ev.stopPropagation();
       if(confirm('Remove this task from the list?')){
         s.tasks.splice(idx,1);
         Object.keys(s.done).forEach(day=>{ if(s.done[day]) delete s.done[day][idx]; });
-        save(s); renderTasks();
+        save(s); renderTasks(); renderTaskCalendar();
       }
     });
     list.appendChild(pill);
@@ -347,71 +317,59 @@ function spinTask(){ const s=load(); if(!s.tasks.length){ alert('Add a task firs
 function shareTip(){ if(navigator.share){ navigator.share({title:'Mood & Spin', text:'Add to Home Screen for app‑like mode', url:location.href}); } else alert('In Safari, tap Share → Add to Home Screen'); }
 function wipe(){ if(confirm('Wipe all data?')){ localStorage.removeItem(LS_KEY); location.reload(); } }
 
-// 30‑day summary (mood = dark bars, energy = light overlay)
-const summaryBtn = document.getElementById('summaryBtn');
-const summaryWrap = document.getElementById('summaryWrap');
-const summaryCanvas = document.getElementById('summaryCanvas');
-const summaryStats = document.getElementById('summaryStats');
+// ---- Calendar helpers ----
+function lastNDays(n){ const arr=[]; for(let i=n-1;i>=0;i--){ const dt=new Date(); dt.setDate(dt.getDate()-i); const key=dt.toISOString().slice(0,10); arr.push({dt,key}); } return arr; }
+function buildCalendar(container, days, renderCell){
+  const el=document.getElementById(container); el.innerHTML='';
+  // Day of week headers
+  const dows=['S','M','T','W','T','F','S'];
+  dows.forEach(d=>{ const h=document.createElement('div'); h.className='dow'; h.textContent=d; el.appendChild(h); });
+  // offset
+  const firstDow = days[0].dt.getDay();
+  for(let i=0;i<firstDow;i++){ const spacer=document.createElement('div'); spacer.className='cell'; spacer.style.visibility='hidden'; el.appendChild(spacer); }
+  // cells
+  days.forEach((d)=>{ const cell=document.createElement('div'); cell.className='cell'; renderCell(cell,d); el.appendChild(cell); });
+}
 
-function toggleSummary(){ summaryWrap.classList.toggle('open'); if(summaryWrap.classList.contains('open')){ drawSummary(); summaryBtn.textContent='Hide'; } else { summaryBtn.textContent='30‑day'; } }
-summaryBtn.addEventListener('click', toggleSummary);
-
-function drawSummary(){
-  const s=load();
-  const ctx = summaryCanvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = summaryCanvas.clientWidth || 320; const cssH = summaryCanvas.clientHeight || 120;
-  summaryCanvas.width = Math.floor(cssW*dpr); summaryCanvas.height = Math.floor(cssH*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,cssW,cssH);
-
-  const days = [];
-  for(let i=29;i>=0;i--){ const dt=new Date(); dt.setDate(dt.getDate()-i); const key=dt.toISOString().slice(0,10); days.push({key, dt, entry: s.entries[key]}); }
-
-  // Stats
-  let sum=0, count=0;
-  days.forEach(d=>{ if(d.entry && d.entry.mood){ sum+=d.entry.mood; count++; }});
-  const avg = count? (sum/count).toFixed(2) : '-';
-  summaryStats.textContent = `avg ${avg} • filled ${count}/30`;
-
-  // Draw bars
-  const pad = 10; const w = cssW - pad*2; const h = cssH - pad*2; const gap = 2; const barW = (w/30) - gap;
-  days.forEach((d,idx)=>{
-    const x = pad + idx*(barW+gap);
-    const mood = d.entry && d.entry.mood ? d.entry.mood : 0;
-    const energy = d.entry && d.entry.energy ? d.entry.energy : 0;
-
-    // track
-    ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(x, pad, barW, h);
-
-    // mood bar (dark)
-    const mH = Math.max(2, h * (mood/5));
-    ctx.fillStyle = moodColor(mood);
-    ctx.fillRect(x, pad + (h - mH), barW, mH);
-
-    // energy overlay (light + narrower with alpha)
-    const eH = Math.max(2, h * (energy/5));
-    const eW = Math.max(2, barW * 0.52);
-    const ex = x + (barW - eW)/2;
-    ctx.fillStyle = hexA(energyColor(energy), 0.9);
-    ctx.fillRect(ex, pad + (h - eH), eW, eH);
-
-    // outline
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-    ctx.strokeRect(x+0.5, pad+0.5, barW-1, h-1);
+function renderMoodCalendar(){
+  const s=load(); const days=lastNDays(30);
+  let sum=0,count=0;
+  buildCalendar('moodCal', days, (cell, d)=>{
+    const entry=s.entries[d.key]||{}; const m=entry.mood||0; const e=entry.energy||0;
+    if(m){ sum+=m; count++; }
+    cell.style.background = m? moodColor(m) : 'rgba(255,255,255,.04)';
+    cell.title = `${d.dt.toDateString()} • Mood ${m||'-'} • Energy ${e||'-'}`;
+    const label=document.createElement('div'); label.className='day'; label.textContent=d.dt.getDate(); cell.appendChild(label);
+    // energy bar
+    const bar=document.createElement('div'); bar.className='energy'; bar.style.background=energyColor(e); bar.style.height=(Math.max(2, Math.round((e/5)* (cell.clientHeight||60)))+'px'); cell.appendChild(bar);
   });
-}
-function hexA(hex, a){
-  if(!hex || hex[0] !== '#') return hex; const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${a})`;
+  const stat = document.getElementById('moodCalStats'); stat.textContent = count? `avg ${ (sum/count).toFixed(2) } • filled ${count}/30` : '—';
 }
 
-// Daily roll: reset strike-throughs for a new day
+function renderTaskCalendar(){
+  const s=load(); const days=lastNDays(30);
+  // compute max to scale intensity (cap at 5)
+  let maxC=1; const counts=days.map(d=>{ const done=s.done[d.key]||{}; const c=Object.values(done).filter(Boolean).length; maxC=Math.max(maxC,c); return {d,c}; });
+  buildCalendar('taskCal', days, (cell, d)=>{
+    const c = (s.done[d.key]) ? Object.values(s.done[d.key]).filter(Boolean).length : 0;
+    const intensity = Math.min(1, c/(maxC||1));
+    const bgA = 0.12 + 0.38*intensity; // 0.12 .. 0.5
+    cell.style.background = `rgba(0,229,255,${bgA})`;
+    cell.style.borderColor = 'rgba(0,229,255,'+(0.25*intensity+0.1)+')';
+    const label=document.createElement('div'); label.className='day'; label.textContent=d.dt.getDate(); cell.appendChild(label);
+    const cnt=document.createElement('div'); cnt.className='count'; cnt.textContent=c; cell.appendChild(cnt);
+    cell.title = `${d.dt.toDateString()} • Tasks completed ${c}`;
+  });
+  const total = counts.reduce((a,b)=>a+b.c,0); document.getElementById('taskCalStats').textContent = `${total} done in 30d`;
+}
+
+// Daily roll: ensure new day keys exist
 (function dailyRoll(){
   let last = todayKey();
   setInterval(()=>{
     const now = todayKey();
     if(now!==last){
-      const s=load(); s.done[now] = s.done[now] || {}; save(s); last = now; renderTasks(); renderHeader(); renderHistory(); drawSummary();
+      const s=load(); s.done[now] = s.done[now] || {}; save(s); last = now; renderTasks(); renderMoodCalendar(); renderTaskCalendar(); renderHeader();
     }
   }, 60*1000);
 })();
@@ -420,8 +378,9 @@ function hexA(hex, a){
 ensureState();
 renderHeader();
 renderMoodEnergy();
-renderHistory();
 renderTasks();
+renderMoodCalendar();
+renderTaskCalendar();
 showTab('mood');
 
 document.getElementById('saveBtn').onclick = saveToday;
