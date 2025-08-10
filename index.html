@@ -12,16 +12,22 @@
 
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#1b1d21">
+  <meta name="theme-color" content="#0b0c10">
 
   <style>
     :root{
-      /* Sleek dark + signal colors */
-      --bg:#1b1d21;          /* page */
-      --surface:#23262b;     /* cards */
-      --surface-2:#1f2227;   /* header/footer */
-      --fg:#ececf1;          /* text */
-      --muted:#a9adba;       /* secondary */
+      /* Background + neon accents */
+      --bg:#0b0c10;            /* deep space */
+      --grid:#1a1d25;          /* subtle grid lines */
+      --neon-cyan:#00e5ff;
+      --neon-magenta:#ff2bd6;
+      --neon-violet:#8b5cf6;
+
+      /* Glass surfaces */
+      --glass:rgba(255,255,255,.06);
+      --glass-stroke:rgba(255,255,255,.18);
+      --fg:#e9eaf2;
+      --muted:#b8bbcc;
 
       /* Mood (dark) */
       --mood-red:#b91c1c;    /* dark red */
@@ -33,77 +39,107 @@
       --energy-yellow:#FDE68A;/* light yellow */
       --energy-green:#86EFAC;/* light green */
 
-      --accent:#8b5cf6;      /* subtle lavender accent */
-      --danger:#ef4444;
+      --radius:10px;         /* moderate rounding */
       --pad:16px;
-      --radius:8px;          /* less rounded */
-      --radius-sm:6px;
     }
+
     *{box-sizing:border-box}
-    html,body{margin:0;height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    body{background:var(--bg);color:var(--fg)}
+    html,body{margin:0;height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    body{color:var(--fg); background: radial-gradient(1200px 600px at 50% -10%, rgba(0,229,255,.12), transparent 60%), radial-gradient(900px 500px at 120% 10%, rgba(255,43,214,.10), transparent 60%), var(--bg);}    
+
+    /* Neon grid overlay */
+    body::before{content:""; position:fixed; inset:0; pointer-events:none; background:
+      repeating-linear-gradient(to right, rgba(255,255,255,.04) 0 1px, transparent 1px 40px),
+      repeating-linear-gradient(to bottom, rgba(255,255,255,.04) 0 1px, transparent 1px 40px);
+      mask: linear-gradient(to bottom, transparent 0, rgba(0,0,0,.6) 10%, rgba(0,0,0,.9) 60%, rgba(0,0,0,.6) 100%);
+    }
 
     /* Safe-area aware wrapper */
     .wrap{min-height:100dvh;display:grid;grid-template-rows:auto 1fr auto}
-    header{position:sticky;top:0;background:var(--surface-2);
-      padding:calc(env(safe-area-inset-top) + 8px) var(--pad) 8px var(--pad);
-      display:flex;align-items:center;gap:12px;z-index:10;border-bottom:1px solid rgba(255,255,255,.06)}
-    h1{font-size:18px;margin:0;font-weight:600}
-    .spacer{height:8px}
 
-    .card{margin:12px;padding:var(--pad);border-radius:var(--radius);background:var(--surface);
-      border:1px solid rgba(255,255,255,.06)}
+    header{
+      position:sticky;top:0;z-index:20;
+      background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+      -webkit-backdrop-filter: blur(10px) saturate(140%);
+      backdrop-filter: blur(10px) saturate(140%);
+      padding:calc(env(safe-area-inset-top) + 10px) var(--pad) 10px var(--pad);
+      border-bottom:1px solid var(--glass-stroke);
+    }
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:22px;height:22px;border-radius:6px;background:conic-gradient(from 0deg, var(--neon-cyan), var(--neon-magenta), var(--neon-violet), var(--neon-cyan)); filter:brightness(1.1); box-shadow:0 0 24px rgba(0,229,255,.25)}
+    h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px}
+
+    /* Panels */
+    .panel{position:relative;margin:12px;border-radius:var(--radius);padding:18px;background:var(--glass);border:1px solid var(--glass-stroke);
+      -webkit-backdrop-filter: blur(12px) saturate(160%);backdrop-filter: blur(12px) saturate(160%);
+      box-shadow:0 20px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.02) inset;
+    }
+    .panel::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:0 0 60px rgba(0,229,255,.06), 0 0 60px rgba(255,43,214,.06)}
+    .panel h2{margin:0 0 10px;font-size:15px;font-weight:600;letter-spacing:.2px}
 
     /* Buttons */
-    button{appearance:none;border:1px solid rgba(255,255,255,.10);border-radius:8px;padding:10px 12px;cursor:pointer;color:var(--fg);background:#2b2f35}
-    button:hover{filter:brightness(1.06)}
-    .primary{background:var(--accent);border-color:transparent;color:#140f24;font-weight:700}
+    button{appearance:none;border:1px solid var(--glass-stroke);border-radius:8px;padding:10px 12px;cursor:pointer;color:var(--fg);background:rgba(255,255,255,.04)}
+    button:hover{filter:brightness(1.08)}
+    .primary{background:linear-gradient(135deg, rgba(0,229,255,.28), rgba(255,43,214,.28)); border-color:transparent; color:#0b0c10; font-weight:800}
     .ghost{background:transparent}
-    .danger{background:var(--danger);border-color:transparent;color:#fff}
+    .danger{background:linear-gradient(135deg, rgba(239,68,68,.9), rgba(239,68,68,.7));border-color:transparent;color:#fff}
 
-    .row{display:flex;gap:8px;align-items:center}
+    .row{display:flex;gap:10px;align-items:center}
     .between{justify-content:space-between}
 
-    /* Chips (squarer) */
+    /* Mood/Energy Chips */
     .chip-row{display:flex;gap:8px;flex-wrap:wrap}
-    .chip{border:1px solid rgba(255,255,255,.12);padding:8px 10px;border-radius:8px;cursor:pointer;background:#262a31}
-    .chip.active{outline:2px solid var(--accent);outline-offset:0}
+    .chip{border:1px solid var(--glass-stroke);padding:8px 10px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,.04)}
+    .chip.active{outline:2px solid var(--neon-cyan);outline-offset:0; box-shadow:0 0 18px rgba(0,229,255,.25)}
 
-    /* 7-day history (sleek squares with inner energy bar) */
-    .history{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px}
-    .dot{height:14px;border-radius:4px;background:#343842;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
-    .dot .inner{position:absolute;left:50%;transform:translateX(-50%);bottom:1px;width:4px;border-radius:3px}
+    /* 7-day history (glass squares + neon inner bar) */
+    .history{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:12px}
+    .dot{height:16px;border-radius:6px;background:#242733;position:relative;overflow:hidden;border:1px solid var(--glass-stroke)}
+    .dot .inner{position:absolute;left:50%;transform:translateX(-50%);bottom:1px;width:5px;border-radius:4px;box-shadow:0 0 10px rgba(255,255,255,.2)}
 
-    textarea{width:100%;min-height:70px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#1e2025;color:var(--fg);padding:10px;resize:vertical}
+    textarea{width:100%;min-height:76px;border-radius:10px;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.05);color:var(--fg);padding:10px;resize:vertical}
 
-    /* Spinner */
-    .list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:#2b2f35;border:1px solid rgba(255,255,255,.10)}
-    .pill.done{opacity:.75;text-decoration:line-through}
-    .pill .x{appearance:none;background:transparent;border:0;color:#c2c6d4;cursor:pointer;font-size:14px;line-height:1}
+    /* Spinner & tasks */
+    .list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--glass-stroke)}
+    .pill.done{opacity:.85;text-decoration:line-through}
+    .pill .x{appearance:none;background:transparent;border:0;color:#d4d6e2;cursor:pointer;font-size:14px;line-height:1}
     .pill .x:hover{color:#fff}
 
-    .result{margin-top:10px;padding:12px;border-radius:8px;background:#1e2025;border:1px dashed rgba(255,255,255,.15);display:flex;align-items:center;gap:8px}
+    .result{margin-top:12px;padding:12px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed var(--glass-stroke);display:flex;align-items:center;gap:10px}
     .result.hidden{display:none}
 
     /* Spin animation */
-    #wheel{width:24px;height:24px;border-radius:50%;border:3px solid #a78bfa;border-top-color:#6d28d9;display:none}
+    #wheel{width:26px;height:26px;border-radius:50%;border:3px solid var(--neon-cyan);border-top-color:var(--neon-magenta);display:none}
     .spinning #wheel{display:inline-block;animation:spin 0.9s linear infinite}
     .spinning #spinBtn{pointer-events:none;opacity:.7}
     @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 
-    footer{background:var(--surface-2);padding:8px var(--pad) calc(env(safe-area-inset-bottom) + 8px);color:var(--muted);font-size:12px;border-top:1px solid rgba(255,255,255,.06)}
+    footer{color:var(--muted);font-size:12px;border-top:1px solid var(--glass-stroke);
+      background:linear-gradient(180deg, rgba(0,0,0,.2), rgba(0,0,0,.5));
+      -webkit-backdrop-filter: blur(10px) saturate(140%);backdrop-filter: blur(10px) saturate(140%);
+      padding:8px var(--pad) calc(env(safe-area-inset-bottom) + 10px);
+    }
 
     /* Summary section */
     #summaryWrap{display:none;margin-top:10px}
     #summaryWrap.open{display:block}
-    #summaryCanvas{width:100%;height:100px;display:block}
+    #summaryCanvas{width:100%;height:110px;display:block}
+
+    /* Reduce motion respect */
+    @media (prefers-reduced-motion: reduce){
+      .spinning #wheel{animation:none}
+      body::before{background:
+        repeating-linear-gradient(to right, rgba(255,255,255,.03) 0 1px, transparent 1px 40px),
+        repeating-linear-gradient(to bottom, rgba(255,255,255,.03) 0 1px, transparent 1px 40px);
+      }
+    }
   </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Mood & Spin</h1>
+    <div class="brand"><div class="logo"></div><h1>Mood & Spin</h1></div>
     <div class="row" style="margin-left:auto">
       <button id="shareBtn" class="ghost">Share</button>
       <button id="wipeBtn" class="danger">Wipe</button>
@@ -111,22 +147,20 @@
   </header>
 
   <main>
-    <div class="spacer"></div>
-
-    <!-- Mood/Energy Card -->
-    <section class="card" aria-labelledby="moodhdr">
+    <!-- Mood & Notes panel -->
+    <section class="panel" aria-labelledby="moodhdr">
       <div class="row between">
-        <h2 id="moodhdr" style="margin:0;font-size:16px;font-weight:600">Today · <span id="today"></span></h2>
+        <h2 id="moodhdr">Today · <span id="today"></span></h2>
         <div class="row">
-          <button id="summaryBtn" class="ghost" title="Show 30‑day summary">30‑day summary</button>
+          <button id="summaryBtn" class="ghost" title="Show 30‑day summary">30‑day</button>
           <button id="saveBtn" class="primary">Save</button>
         </div>
       </div>
 
-      <div style="height:8px"></div>
+      <div style="height:6px"></div>
       <div class="chip-row" id="moodRow" aria-label="Mood"></div>
 
-      <div style="height:8px"></div>
+      <div style="height:6px"></div>
       <div class="chip-row" id="energyRow" aria-label="Energy"></div>
 
       <div style="height:8px"></div>
@@ -144,12 +178,12 @@
       </div>
     </section>
 
-    <!-- Spinner Card -->
-    <section class="card" aria-labelledby="spinhdr">
+    <!-- Spinner & Tasks panel -->
+    <section class="panel" aria-labelledby="spinhdr">
       <div class="row between">
-        <h2 id="spinhdr" style="margin:0;font-size:16px;font-weight:600">Random Task Spinner</h2>
+        <h2 id="spinhdr">Random Task Spinner</h2>
         <div class="row">
-          <input id="newTask" placeholder="Add a task…" style="background:#1e2025;border:1px solid rgba(255,255,255,.12);color:var(--fg);padding:8px 10px;border-radius:6px;min-width:140px"/>
+          <input id="newTask" placeholder="Add a task…" style="background:rgba(255,255,255,.06);border:1px solid var(--glass-stroke);color:var(--fg);padding:8px 10px;border-radius:8px;min-width:140px"/>
           <button id="addBtn" class="ghost">Add</button>
           <button id="spinBtn" class="primary">Spin 🎲</button>
         </div>
@@ -163,7 +197,7 @@
   </main>
 
   <footer>
-    Offline‑ready • Add to Home Screen in Safari • v1.4
+    Offline‑ready • Add to Home Screen in Safari • v2.0
   </footer>
 </div>
 
@@ -197,19 +231,19 @@ function ensureState(){
 function renderHeader(){ document.getElementById('today').textContent = fmtDate(); }
 
 // Color helpers
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 function moodColor(v){
-  if(!v) return '#343842';
-  if(v<=2) return getCSS('--mood-red');
-  if(v===3) return getCSS('--mood-yellow');
-  return getCSS('--mood-green');
+  if(!v) return '#222733';
+  if(v<=2) return cssVar('--mood-red');
+  if(v===3) return cssVar('--mood-yellow');
+  return cssVar('--mood-green');
 }
 function energyColor(v){
   if(!v) return '#3a3d46';
-  if(v<=2) return getCSS('--energy-red');
-  if(v===3) return getCSS('--energy-yellow');
-  return getCSS('--energy-green');
+  if(v<=2) return cssVar('--energy-red');
+  if(v===3) return cssVar('--energy-yellow');
+  return cssVar('--energy-green');
 }
-function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
 function renderMoodEnergy(){
   const s=load(); const d=todayKey(); const e=s.entries[d]||{};
@@ -237,7 +271,7 @@ function renderHistory(){
     // Energy as thin center bar with proportional height
     const inner=document.createElement('span'); inner.className='inner';
     inner.style.background = energyColor(e.energy);
-    const h = 12 * ((e.energy||0)/5); // 0..12px
+    const h = 14 * ((e.energy||0)/5); // 0..14px
     inner.style.height = Math.max(2, Math.round(h)) + 'px';
     dot.appendChild(inner);
 
@@ -302,14 +336,14 @@ const summaryWrap = document.getElementById('summaryWrap');
 const summaryCanvas = document.getElementById('summaryCanvas');
 const summaryStats = document.getElementById('summaryStats');
 
-function toggleSummary(){ summaryWrap.classList.toggle('open'); if(summaryWrap.classList.contains('open')){ drawSummary(); summaryBtn.textContent='Hide summary'; } else { summaryBtn.textContent='30‑day summary'; } }
+function toggleSummary(){ summaryWrap.classList.toggle('open'); if(summaryWrap.classList.contains('open')){ drawSummary(); summaryBtn.textContent='Hide'; } else { summaryBtn.textContent='30‑day'; } }
 summaryBtn.addEventListener('click', toggleSummary);
 
 function drawSummary(){
   const s=load();
   const ctx = summaryCanvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const cssW = summaryCanvas.clientWidth || 300; const cssH = summaryCanvas.clientHeight || 100;
+  const cssW = summaryCanvas.clientWidth || 320; const cssH = summaryCanvas.clientHeight || 110;
   summaryCanvas.width = Math.floor(cssW*dpr); summaryCanvas.height = Math.floor(cssH*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,cssW,cssH);
@@ -324,28 +358,25 @@ function drawSummary(){
   summaryStats.textContent = `avg ${avg} • filled ${count}/30`;
 
   // Draw bars
-  const pad = 8; const w = cssW - pad*2; const h = cssH - pad*2; const gap = 2; const barW = (w/30) - gap;
+  const pad = 10; const w = cssW - pad*2; const h = cssH - pad*2; const gap = 2; const barW = (w/30) - gap;
   days.forEach((d,idx)=>{
     const x = pad + idx*(barW+gap);
     const mood = d.entry && d.entry.mood ? d.entry.mood : 0;
     const energy = d.entry && d.entry.energy ? d.entry.energy : 0;
 
-    // background track
-    const track = '#2b2f35';
-    const mH = Math.max(2, h * (mood/5));
-    const eH = Math.max(2, h * (energy/5));
-
     // track
-    ctx.fillStyle = track; ctx.fillRect(x, pad, barW, h);
+    ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(x, pad, barW, h);
 
     // mood bar (dark)
+    const mH = Math.max(2, h * (mood/5));
     ctx.fillStyle = moodColor(mood);
     ctx.fillRect(x, pad + (h - mH), barW, mH);
 
     // energy overlay (light + narrower with alpha)
-    const eW = Math.max(2, barW * 0.5);
+    const eH = Math.max(2, h * (energy/5));
+    const eW = Math.max(2, barW * 0.52);
     const ex = x + (barW - eW)/2;
-    ctx.fillStyle = hexWithAlpha(energyColor(energy), 0.85);
+    ctx.fillStyle = hexA(energyColor(energy), 0.9);
     ctx.fillRect(ex, pad + (h - eH), eW, eH);
 
     // outline
@@ -353,11 +384,8 @@ function drawSummary(){
     ctx.strokeRect(x+0.5, pad+0.5, barW-1, h-1);
   });
 }
-function hexWithAlpha(hex, alpha){
-  // hex like #RRGGBB, return rgba()
-  if(!hex || hex[0] !== '#') return hex;
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${alpha})`;
+function hexA(hex, a){
+  if(!hex || hex[0] !== '#') return hex; const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${a})`;
 }
 
 // Daily roll: reset strike-throughs for a new day
