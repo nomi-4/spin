@@ -80,8 +80,8 @@
     .btab.active{background:linear-gradient(135deg, rgba(0,229,255,.35), rgba(255,43,214,.35));border-color:transparent;color:#0b0c10;font-weight:800;box-shadow:0 0 28px rgba(0,229,255,.35), 0 0 14px rgba(255,43,214,.28)}
 
     /* Screens */
-    main{position:relative;min-height:0;padding-bottom:var(--nav-h,84px)}
-    .screen{position:relative;overflow:auto;padding:14px}
+    main{position:relative;min-height:0;padding-bottom:var(--nav-h,84px);padding-top:calc(env(safe-area-inset-top) + 8px)}
+    .screen{position:relative;overflow:auto;padding:14px;padding-left:calc(14px + env(safe-area-inset-left));padding-right:calc(14px + env(safe-area-inset-right))}
     .screen.hidden{display:none}
 
     /* Glass panel feel, full-bleed */
