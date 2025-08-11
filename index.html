@@ -358,72 +358,65 @@ function wipe(){ if(confirm('Wipe all data?')){ localStorage.removeItem(LS_KEY);
 // ---- Calendar helpers ----
 function lastNDays(n){ const arr=[]; for(let i=n-1;i>=0;i--){ const dt=new Date(); dt.setDate(dt.getDate()-i); const key=dt.toISOString().slice(0,10); arr.push({dt,key}); } return arr; }
 function buildCalendar(container, days, renderCell){
-  const el=document.getElementById(container); el.innerHTML='';
-  // Simple 7-column grid; no weekday headers or offsets
-  days.forEach((d)=>{ const cell=document.createElement('div'); cell.className='cell'; renderCell(cell,d); el.appendChild(cell); });
-});
-  // offset
-  const firstDow = days[0].dt.getDay();
-  for(let i=0;i<firstDow;i++){ const spacer=document.createElement('div'); spacer.className='cell'; spacer.style.visibility='hidden'; el.appendChild(spacer); }
-  // cells
-  days.forEach((d)=>{ const cell=document.createElement('div'); cell.className='cell'; renderCell(cell,d); el.appendChild(cell); });
+  const el = document.getElementById(container);
+  el.innerHTML = '';
+  days.forEach(d => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    renderCell(cell, d);
+    el.appendChild(cell);
+  });
 }
 
 function renderMoodCalendar(){
-  const s=load(); const days=lastNDays(28);
-  let sum=0,count=0;
-  buildCalendar('moodCal', days, (cell, d)=>{
-    const entry=s.entries[d.key]||{}; const m=entry.mood||0; const e=entry.energy||0;
-    if(m){ sum+=m; count++; }
+  const s = load();
+  const days = lastNDays(28);
+  let sum = 0, count = 0;
+  buildCalendar('moodCal', days, (cell, d) => {
+    const entry = s.entries[d.key] || {};
+    const m = entry.mood || 0;
+    const e = entry.energy || 0;
+    if (m) { sum += m; count++; }
     // Background = energy level (purple→lavender)
     cell.style.background = energyColor(e);
     cell.title = `${d.dt.toDateString()} • Mood ${m||'-'} • Energy ${e||'-'}`;
     // centered mood emoji overlay
-    if(m){ const emo=document.createElement('div'); emo.className='emo'; emo.textContent = EMOJI[m-1] || ''; cell.appendChild(emo); }
+    if (m){
+      const emo = document.createElement('div');
+      emo.className = 'emo';
+      emo.textContent = EMOJI[m-1] || '';
+      cell.appendChild(emo);
+    }
   });
-  const stat = document.getElementById('moodCalStats'); stat.textContent = count? `avg ${(sum/count).toFixed(2)} • filled ${count}/28` : '—';
-}; const m=entry.mood||0; const e=entry.energy||0;
-    if(m){ sum+=m; count++; }
-    // Background = energy level (purple→lavender)
-    cell.style.background = energyColor(e);
-    cell.title = `${d.dt.toDateString()} • Mood ${m||'-'} • Energy ${e||'-'}`;
-    // tiny day number in corner
-    const label=document.createElement('div'); label.className='day'; label.textContent=d.dt.getDate(); cell.appendChild(label);
-    // centered mood emoji overlay
-    if(m){ const emo=document.createElement('div'); emo.className='emo'; emo.textContent = EMOJI[m-1] || ''; cell.appendChild(emo); }
-  });
-  const stat = document.getElementById('moodCalStats'); stat.textContent = count? `avg ${(sum/count).toFixed(2)} • filled ${count}/28` : '—';
+  const stat = document.getElementById('moodCalStats');
+  stat.textContent = count ? `avg ${(sum/count).toFixed(2)} • filled ${count}/28` : '—';
 }
 
 function renderTaskCalendar(){
-  const s=load(); const days=lastNDays(28);
-  let maxC=1; const counts=days.map(d=>{ const done=s.done[d.key]||{}; const c=Object.values(done).filter(Boolean).length; maxC=Math.max(maxC,c); return {d,c}; });
-  buildCalendar('taskCal', days, (cell, d)=>{
+  const s = load();
+  const days = lastNDays(28);
+  let maxC = 1;
+  const counts = days.map(d => {
+    const done = s.done[d.key] || {};
+    const c = Object.values(done).filter(Boolean).length;
+    maxC = Math.max(maxC, c);
+    return {d, c};
+  });
+  buildCalendar('taskCal', days, (cell, d) => {
     const c = (s.done[d.key]) ? Object.values(s.done[d.key]).filter(Boolean).length : 0;
     const intensity = Math.min(1, c/(maxC||1));
     const bgA = 0.12 + 0.38*intensity; // 0.12 .. 0.5
     cell.style.background = `rgba(0,229,255,${bgA})`;
-    cell.style.borderColor = 'rgba(0,229,255,'+(0.25*intensity+0.1)+')';
-    // Big centered count only (no topline date)
-    const cnt=document.createElement('div'); cnt.className='count'; cnt.textContent=c; cell.appendChild(cnt);
+    cell.style.borderColor = `rgba(0,229,255,${0.25*intensity+0.1})`;
+    // Big centered count only
+    const cnt = document.createElement('div');
+    cnt.className = 'count';
+    cnt.textContent = c;
+    cell.appendChild(cnt);
     cell.title = `${d.dt.toDateString()} • Tasks completed ${c}`;
   });
-  const total = counts.reduce((a,b)=>a+b.c,0); document.getElementById('taskCalStats').textContent = `${total} done in 28d`;
-}; const c=Object.values(done).filter(Boolean).length; maxC=Math.max(maxC,c); return {d,c}; });
-  buildCalendar('taskCal', days, (cell, d)=>{
-    const c = (s.done[d.key]) ? Object.values(s.done[d.key]).filter(Boolean).length : 0;
-    const intensity = Math.min(1, c/(maxC||1));
-    const bgA = 0.12 + 0.38*intensity; // 0.12 .. 0.5
-    cell.style.background = `rgba(0,229,255,${bgA})`;
-    cell.style.borderColor = 'rgba(0,229,255,'+(0.25*intensity+0.1)+')';
-    // Top center day label: Tue 5
-    const abbr = d.dt.toLocaleDateString(undefined,{weekday:'short'});
-    const top=document.createElement('div'); top.className='topline'; top.textContent=`${abbr} ${d.dt.getDate()}`; cell.appendChild(top);
-    // Big centered count
-    const cnt=document.createElement('div'); cnt.className='count'; cnt.textContent=c; cell.appendChild(cnt);
-    cell.title = `${d.dt.toDateString()} • Tasks completed ${c}`;
-  });
-  const total = counts.reduce((a,b)=>a+b.c,0); document.getElementById('taskCalStats').textContent = `${total} done in 28d`;
+  const total = counts.reduce((a,b) => a + b.c, 0);
+  document.getElementById('taskCalStats').textContent = `${total} done in 28d`;
 }
 
 // Daily roll: ensure new day keys exist
