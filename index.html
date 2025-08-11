@@ -14,10 +14,10 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b0c10">
 
-  <!-- Font: Space Grotesk -->
+  <!-- Font: Outfit (minimal) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root{
@@ -39,17 +39,20 @@
       --mood-yellow:#b45309; /* dark amber */
       --mood-green:#166534;  /* dark green */
 
-      /* Energy (light) */
-      --energy-red:#FCA5A5;  /* light red */
-      --energy-yellow:#FDE68A;/* light yellow */
-      --energy-green:#86EFAC;/* light green */
+      /* Energy scale (purple → lavender) */
+      --energy-1:#341a6e;  /* darkest */
+      --energy-2:#4b2a97;
+      --energy-3:#6b45c6;
+      --energy-4:#a78bfa;
+      --energy-5:#e9d5ff;  /* lightest */
+      /* light green */
 
       --radius:10px;
       --pad:16px;
     }
 
     *{box-sizing:border-box}
-    html,body{margin:0;height:100%;font-family:"Space Grotesk",Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    html,body{margin:0;height:100%;font-family:"Outfit",Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     body{color:var(--fg); background: radial-gradient(1200px 600px at 50% -10%, rgba(0,229,255,.12), transparent 60%), radial-gradient(900px 500px at 120% 10%, rgba(255,43,214,.10), transparent 60%), var(--bg);}    
 
     /* Neon grid overlay */
@@ -116,8 +119,10 @@
     .dow{font-size:11px;color:var(--muted);text-align:center}
     .cell{position:relative;aspect-ratio:1/1;border-radius:10px;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.04);overflow:hidden}
     .cell .day{position:absolute;top:6px;left:6px;font-size:11px;color:var(--muted)}
+    .cell .topline{position:absolute;top:4px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);text-align:center;white-space:nowrap}
     .cell .energy{position:absolute;right:4px;bottom:4px;width:6px;border-radius:4px}
-    .cell .count{position:absolute;inset:0;display:grid;place-items:center;font-weight:700}
+    .cell .emo{position:absolute;inset:0;display:grid;place-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));opacity:.95}
+    .cell .count{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:clamp(18px,5.5vw,26px);line-height:1.1;text-shadow:0 2px 6px rgba(0,0,0,.35)}
   </style>
 </head>
 <body>
@@ -246,10 +251,9 @@ function moodColor(v){
   return cssVar('--mood-green');
 }
 function energyColor(v){
-  if(!v) return '#3a3d46';
-  if(v<=2) return cssVar('--energy-red');
-  if(v===3) return cssVar('--energy-yellow');
-  return cssVar('--energy-green');
+  if(!v) return 'rgba(255,255,255,.04)';
+  const map = ['','--energy-1','--energy-2','--energy-3','--energy-4','--energy-5'];
+  return cssVar(map[v]||'--energy-3');
 }
 
 function renderMoodEnergy(){
@@ -337,6 +341,19 @@ function renderMoodCalendar(){
   buildCalendar('moodCal', days, (cell, d)=>{
     const entry=s.entries[d.key]||{}; const m=entry.mood||0; const e=entry.energy||0;
     if(m){ sum+=m; count++; }
+    // Background = energy level (purple→lavender)
+    cell.style.background = energyColor(e);
+    cell.title = `${d.dt.toDateString()} • Mood ${m||'-'} • Energy ${e||'-'}`;
+    // tiny day number in corner
+    const label=document.createElement('div'); label.className='day'; label.textContent=d.dt.getDate(); cell.appendChild(label);
+    // centered mood emoji overlay
+    if(m){
+      const emo=document.createElement('div'); emo.className='emo'; emo.textContent = EMOJI[m-1] || ''; cell.appendChild(emo);
+    }
+  });
+  const stat = document.getElementById('moodCalStats'); stat.textContent = count? `avg ${ (sum/count).toFixed(2) } • filled ${count}/30` : '—';
+}; const m=entry.mood||0; const e=entry.energy||0;
+    if(m){ sum+=m; count++; }
     cell.style.background = m? moodColor(m) : 'rgba(255,255,255,.04)';
     cell.title = `${d.dt.toDateString()} • Mood ${m||'-'} • Energy ${e||'-'}`;
     const label=document.createElement('div'); label.className='day'; label.textContent=d.dt.getDate(); cell.appendChild(label);
@@ -348,8 +365,22 @@ function renderMoodCalendar(){
 
 function renderTaskCalendar(){
   const s=load(); const days=lastNDays(30);
-  // compute max to scale intensity (cap at 5)
   let maxC=1; const counts=days.map(d=>{ const done=s.done[d.key]||{}; const c=Object.values(done).filter(Boolean).length; maxC=Math.max(maxC,c); return {d,c}; });
+  buildCalendar('taskCal', days, (cell, d)=>{
+    const c = (s.done[d.key]) ? Object.values(s.done[d.key]).filter(Boolean).length : 0;
+    const intensity = Math.min(1, c/(maxC||1));
+    const bgA = 0.12 + 0.38*intensity; // 0.12 .. 0.5
+    cell.style.background = `rgba(0,229,255,${bgA})`;
+    cell.style.borderColor = 'rgba(0,229,255,'+(0.25*intensity+0.1)+')';
+    // Top center day label: Tue 5
+    const abbr = d.dt.toLocaleDateString(undefined,{weekday:'short'});
+    const top=document.createElement('div'); top.className='topline'; top.textContent=`${abbr} ${d.dt.getDate()}`; cell.appendChild(top);
+    // Big centered count
+    const cnt=document.createElement('div'); cnt.className='count'; cnt.textContent=c; cell.appendChild(cnt);
+    cell.title = `${d.dt.toDateString()} • Tasks completed ${c}`;
+  });
+  const total = counts.reduce((a,b)=>a+b.c,0); document.getElementById('taskCalStats').textContent = `${total} done in 30d`;
+}; const c=Object.values(done).filter(Boolean).length; maxC=Math.max(maxC,c); return {d,c}; });
   buildCalendar('taskCal', days, (cell, d)=>{
     const c = (s.done[d.key]) ? Object.values(s.done[d.key]).filter(Boolean).length : 0;
     const intensity = Math.min(1, c/(maxC||1));
