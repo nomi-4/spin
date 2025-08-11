@@ -408,4 +408,414 @@ if('serviceWorker' in navigator){
 }
 </script>
 </body>
+</html><!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Mood & Spin</title>
+
+  <!-- iOS full-screen hints -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b0c10">
+
+  <!-- Font: Outfit (minimal) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      /* Background + neon accents */
+      --bg:#0b0c10;            /* deep space */
+      --grid:#1a1d25;          /* subtle grid lines */
+      --neon-cyan:#00e5ff;
+      --neon-magenta:#ff2bd6;
+      --neon-violet:#8b5cf6;
+
+      /* Glass surfaces */
+      --glass:rgba(255,255,255,.06);
+      --glass-stroke:rgba(255,255,255,.18);
+      --fg:#e9eaf2;
+      --muted:#b8bbcc;
+
+      /* Mood (dark) */
+      --mood-red:#b91c1c;    /* dark red */
+      --mood-yellow:#b45309; /* dark amber */
+      --mood-green:#166534;  /* dark green */
+
+      /* Energy scale (purple → lavender) */
+      --energy-1:#341a6e;  /* darkest */
+      --energy-2:#4b2a97;
+      --energy-3:#6b45c6;
+      --energy-4:#a78bfa;
+      --energy-5:#e9d5ff;  /* lightest */
+      /* light green */
+
+      --radius:10px;
+      --pad:16px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;font-family:"Outfit",Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    body{color:var(--fg); background: radial-gradient(1200px 600px at 50% -10%, rgba(0,229,255,.12), transparent 60%), radial-gradient(900px 500px at 120% 10%, rgba(255,43,214,.10), transparent 60%), var(--bg);}    
+
+    /* Neon grid overlay */
+    body::before{content:""; position:fixed; inset:0; pointer-events:none; background:
+      repeating-linear-gradient(to right, rgba(255,255,255,.04) 0 1px, transparent 1px 40px),
+      repeating-linear-gradient(to bottom, rgba(255,255,255,.04) 0 1px, transparent 1px 40px);
+      mask: linear-gradient(to bottom, transparent 0, rgba(0,0,0,.6) 10%, rgba(0,0,0,.9) 60%, rgba(0,0,0,.6) 100%);
+    }
+
+    /* Layout */
+    .wrap{min-height:100dvh;display:grid;grid-template-rows:1fr auto}
+
+    /* Bottom nav */
+    .bottombar{position:sticky;bottom:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:8px var(--pad) calc(env(safe-area-inset-bottom) + 10px) var(--pad);
+      background:linear-gradient(180deg, rgba(0,0,0,.25), rgba(0,0,0,.6));
+      -webkit-backdrop-filter: blur(10px) saturate(140%);backdrop-filter: blur(10px) saturate(140%);
+      border-top:1px solid var(--glass-stroke);
+    }
+    .bottombar .left{display:flex;gap:8px}
+    .bottombar .right{display:flex;gap:8px}
+    .btab{appearance:none;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.04);color:var(--fg);padding:10px 14px;border-radius:12px;cursor:pointer}
+    .btab.active{background:linear-gradient(135deg, rgba(0,229,255,.28), rgba(255,43,214,.28));border-color:transparent;color:#0b0c10;font-weight:800;box-shadow:0 0 18px rgba(0,229,255,.2)}
+    .bghost{appearance:none;border:1px solid var(--glass-stroke);background:transparent;color:var(--fg);padding:10px 12px;border-radius:10px;cursor:pointer}
+    .bdanger{appearance:none;border:0;background:linear-gradient(135deg, rgba(239,68,68,.9), rgba(239,68,68,.7));color:#fff;padding:10px 12px;border-radius:10px;cursor:pointer}
+
+    /* Screens */
+    main{position:relative;min-height:0}
+    .screen{position:absolute;inset:0;overflow:auto;padding:14px}
+    .screen.hidden{display:none}
+
+    /* Glass panel feel, full-bleed */
+    .panel{position:relative;border-radius:var(--radius);padding:18px;background:var(--glass);border:1px solid var(--glass-stroke);
+      -webkit-backdrop-filter: blur(12px) saturate(160%);backdrop-filter: blur(12px) saturate(160%);
+      box-shadow:0 20px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.02) inset;
+    }
+    .panel h2{margin:0 0 10px;font-size:15px;font-weight:700;letter-spacing:.2px}
+
+    /* Chips */
+    .chip-row{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{border:1px solid var(--glass-stroke);padding:8px 10px;border-radius:10px;cursor:pointer;background:rgba(255,255,255,.04)}
+    .chip.active{outline:2px solid var(--neon-cyan);outline-offset:0; box-shadow:0 0 18px rgba(0,229,255,.25)}
+
+    textarea{width:100%;min-height:76px;border-radius:10px;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.05);color:var(--fg);padding:10px;resize:vertical}
+
+    /* Spinner & tasks */
+    .list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--glass-stroke)}
+    .pill.done{opacity:.85;text-decoration:line-through}
+    .pill .x{appearance:none;background:transparent;border:0;color:#d4d6e2;cursor:pointer;font-size:14px;line-height:1}
+    .pill .x:hover{color:#fff}
+
+    .result{margin-top:12px;padding:12px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed var(--glass-stroke);display:flex;align-items:center;gap:10px}
+    .result.hidden{display:none}
+
+    /* Spin animation */
+    #wheel{width:26px;height:26px;border-radius:50%;border:3px solid var(--neon-cyan);border-top-color:var(--neon-magenta);display:none}
+    .spinning #wheel{display:inline-block;animation:spin 0.9s linear infinite}
+    .spinning #spinBtn{pointer-events:none;opacity:.7}
+    @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+    /* Calendar grids */
+    .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:12px}
+    .dow{font-size:11px;color:var(--muted);text-align:center}
+    .cell{position:relative;aspect-ratio:1/1;border-radius:10px;border:1px solid var(--glass-stroke);background:rgba(255,255,255,.04);overflow:hidden}
+    .cell .day{position:absolute;top:6px;left:6px;font-size:11px;color:var(--muted)}
+    .cell .topline{position:absolute;top:4px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);text-align:center;white-space:nowrap}
+    .cell .energy{position:absolute;right:4px;bottom:4px;width:6px;border-radius:4px}
+    .cell .emo{position:absolute;inset:0;display:grid;place-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));opacity:.95}
+    .cell .count{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:clamp(18px,5.5vw,26px);line-height:1.1;text-shadow:0 2px 6px rgba(0,0,0,.35)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <main>
+    <!-- Mood Screen -->
+    <section id="moodTab" class="screen">
+      <div class="panel" aria-labelledby="moodhdr">
+        <div class="row between">
+          <h2 id="moodhdr">Today · <span id="today"></span></h2>
+          <div class="row">
+            <button id="saveBtn" class="primary">Save</button>
+          </div>
+        </div>
+
+        <div style="height:6px"></div>
+        <div class="chip-row" id="moodRow" aria-label="Mood"></div>
+
+        <div style="height:6px"></div>
+        <div class="chip-row" id="energyRow" aria-label="Energy"></div>
+
+        <div style="height:8px"></div>
+        <label for="note" class="sr-only">Note</label>
+        <textarea id="note" placeholder="Add a quick note (optional)"></textarea>
+
+        <!-- 30‑day calendar summary for mood+energy -->
+        <div style="height:10px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px">
+          <span>Last 30 days · calendar</span>
+          <span id="moodCalStats"></span>
+        </div>
+        <div id="moodCal" class="calendar" aria-label="Last 30 days mood calendar"></div>
+      </div>
+    </section>
+
+    <!-- Tasks Screen -->
+    <section id="tasksTab" class="screen hidden">
+      <div class="panel" aria-labelledby="spinhdr">
+        <div class="row between">
+          <h2 id="spinhdr">Random Task Spinner</h2>
+          <div class="row">
+            <input id="newTask" placeholder="Add a task…" style="background:rgba(255,255,255,.06);border:1px solid var(--glass-stroke);color:var(--fg);padding:8px 10px;border-radius:10px;min-width:140px"/>
+            <button id="addBtn" class="ghost">Add</button>
+            <button id="spinBtn" class="primary">Spin 🎲</button>
+          </div>
+        </div>
+        <div class="list" id="taskList"></div>
+        <div id="spinResult" class="result hidden">
+          <div id="wheel"></div>
+          <div id="spinText"></div>
+        </div>
+
+        <!-- 30‑day calendar summary for completed tasks -->
+        <div style="height:14px"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px">
+          <span>Last 30 days · tasks done</span>
+          <span id="taskCalStats"></span>
+        </div>
+        <div id="taskCal" class="calendar" aria-label="Last 30 days tasks calendar"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottombar" role="tablist" aria-label="Primary">
+    <div class="left">
+      <button id="btabMood" class="btab active" role="tab" aria-selected="true" aria-controls="moodTab">Mood</button>
+      <button id="btabTasks" class="btab" role="tab" aria-selected="false" aria-controls="tasksTab">Tasks</button>
+    </div>
+    <div class="right">
+      <button id="shareBtn" class="bghost">Share</button>
+      <button id="wipeBtn" class="bdanger">Wipe</button>
+    </div>
+  </nav>
+</div>
+
+<script>
+// ---- Utilities ----
+const fmtDate = (d=new Date())=> d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'});
+const todayKey = ()=> new Date().toISOString().slice(0,10);
+const LS_KEY = 'moodspin-v1';
+const load = () => { try { return JSON.parse(localStorage.getItem(LS_KEY))||{} } catch { return {} } };
+const save = s => localStorage.setItem(LS_KEY, JSON.stringify(s));
+
+// Tabs
+const tabMoodBtn = document.getElementById('btabMood');
+const tabTasksBtn = document.getElementById('btabTasks');
+const moodScreen = document.getElementById('moodTab');
+const tasksScreen = document.getElementById('tasksTab');
+function showTab(which){
+  const moodActive = which==='mood';
+  tabMoodBtn.classList.toggle('active', moodActive);
+  tabTasksBtn.classList.toggle('active', !moodActive);
+  tabMoodBtn.setAttribute('aria-selected', moodActive);
+  tabTasksBtn.setAttribute('aria-selected', !moodActive);
+  moodScreen.classList.toggle('hidden', !moodActive);
+  tasksScreen.classList.toggle('hidden', moodActive);
+}
+
+// State: { entries:{[date]:{mood:number, energy:number, note:string}}, tasks:[string], done:{[date]:{[taskIndex]:true}} }
+const EMOJI = ['😣','🙁','😐','🙂','😀']; // 1..5
+const ENERGY = ['1','2','3','4','5'];     // 1..5
+
+const moodRow = document.getElementById('moodRow');
+const energyRow = document.getElementById('energyRow');
+const noteEl = document.getElementById('note');
+
+const spinResult = document.getElementById('spinResult');
+const spinText = document.getElementById('spinText');
+
+function ensureState(){
+  const s=load();
+  s.entries = s.entries || {};
+  s.tasks   = s.tasks   || ['Dishes','Tidy 5 min','Wipe counters','Water plants'];
+  s.done    = s.done    || {}; // per-day map
+  save(s);
+}
+
+function renderHeader(){ document.getElementById('today').textContent = fmtDate(); }
+
+// Color helpers
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function moodColor(v){
+  if(!v) return '#222733';
+  if(v<=2) return cssVar('--mood-red');
+  if(v===3) return cssVar('--mood-yellow');
+  return cssVar('--mood-green');
+}
+function energyColor(v){
+  if(!v) return 'rgba(255,255,255,.04)';
+  const map = ['','--energy-1','--energy-2','--energy-3','--energy-4','--energy-5'];
+  return cssVar(map[v]||'--energy-3');
+}
+
+function renderMoodEnergy(){
+  const s=load(); const d=todayKey(); const e=s.entries[d]||{};
+  moodRow.innerHTML='';
+  EMOJI.forEach((em,i)=>{
+    const b=document.createElement('button'); b.className='chip'+(e.mood===i+1?' active':''); b.textContent=em; b.onclick=()=>{ e.mood=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderMoodCalendar(); };
+    moodRow.appendChild(b);
+  });
+  energyRow.innerHTML='';
+  ENERGY.forEach((lbl,i)=>{
+    const b=document.createElement('button'); b.className='chip'+(e.energy===i+1?' active':''); b.textContent='⚡ '+lbl; b.onclick=()=>{ e.energy=i+1; s.entries[d]=e; save(s); renderMoodEnergy(); renderMoodCalendar(); };
+    energyRow.appendChild(b);
+  });
+  noteEl.value = e.note||'';
+}
+
+// Save button commits note too
+function saveToday(){ const s=load(); const d=todayKey(); const e=s.entries[d]||{}; e.note = noteEl.value.trim(); s.entries[d]=e; save(s); if(spinResult){ spinResult.classList.remove('hidden'); spinText.textContent='Saved ✓'; setTimeout(()=>{ spinResult.classList.add('hidden'); }, 1200); } }
+
+// Spinner with animation and persistent daily strikes
+let spinTimer;
+function renderTasks(){
+  const s=load();
+  const d=todayKey();
+  s.done[d] = s.done[d] || {};
+  const list=document.getElementById('taskList');
+  list.innerHTML='';
+  s.tasks.forEach((t,idx)=>{
+    const pill=document.createElement('span'); pill.className='pill';
+    if(s.done[d][idx]) pill.classList.add('done');
+    pill.innerHTML = `${t} <button aria-label="Remove task" data-idx="${idx}" class="x">×</button>`;
+    pill.addEventListener('click', (ev)=>{
+      if(ev.target.classList.contains('x')) return; // handled below
+      s.done[d][idx] = !s.done[d][idx];
+      save(s); renderTasks(); renderTaskCalendar();
+    });
+    pill.querySelector('.x').addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      if(confirm('Remove this task from the list?')){
+        s.tasks.splice(idx,1);
+        Object.keys(s.done).forEach(day=>{ if(s.done[day]) delete s.done[day][idx]; });
+        save(s); renderTasks(); renderTaskCalendar();
+      }
+    });
+    list.appendChild(pill);
+  });
+}
+function addTask(){ const inp=document.getElementById('newTask'); const v=inp.value.trim(); if(!v) return; const s=load(); s.tasks.push(v); save(s); inp.value=''; renderTasks(); }
+function spinTask(){ const s=load(); if(!s.tasks.length){ alert('Add a task first'); return; }
+  // Start animation
+  document.body.classList.add('spinning');
+  spinResult.classList.remove('hidden');
+  let i=0; spinText.textContent='Spinning…';
+  spinTimer = setInterval(()=>{ const pick = s.tasks[i++ % s.tasks.length]; spinText.textContent = 'Spinning… ' + pick; }, 120);
+  setTimeout(()=>{
+    clearInterval(spinTimer);
+    const final = s.tasks[Math.floor(Math.random()*s.tasks.length)];
+    spinText.innerHTML = `<strong>Do this now:</strong> ${final}`;
+    document.body.classList.remove('spinning');
+  }, 1200);
+}
+
+// Share + Wipe
+function shareTip(){ if(navigator.share){ navigator.share({title:'Mood & Spin', text:'Add to Home Screen for app‑like mode', url:location.href}); } else alert('In Safari, tap Share → Add to Home Screen'); }
+function wipe(){ if(confirm('Wipe all data?')){ localStorage.removeItem(LS_KEY); location.reload(); } }
+
+// ---- Calendar helpers ----
+function lastNDays(n){ const arr=[]; for(let i=n-1;i>=0;i--){ const dt=new Date(); dt.setDate(dt.getDate()-i); const key=dt.toISOString().slice(0,10); arr.push({dt,key}); } return arr; }
+function buildCalendar(container, days, renderCell){
+  const el=document.getElementById(container); el.innerHTML='';
+  // Day of week headers
+  const dows=['S','M','T','W','T','F','S'];
+  dows.forEach(d=>{ const h=document.createElement('div'); h.className='dow'; h.textContent=d; el.appendChild(h); });
+  // offset
+  const firstDow = days[0].dt.getDay();
+  for(let i=0;i<firstDow;i++){ const spacer=document.createElement('div'); spacer.className='cell'; spacer.style.visibility='hidden'; el.appendChild(spacer); }
+  // cells
+  days.forEach((d)=>{ const cell=document.createElement('div'); cell.className='cell'; renderCell(cell,d); el.appendChild(cell); });
+}
+
+function renderMoodCalendar(){
+  const s=load(); const days=lastNDays(30);
+  let sum=0,count=0;
+  buildCalendar('moodCal', days, (cell, d)=>{
+    const entry=s.entries[d.key]||{}; const m=entry.mood||0; const e=entry.energy||0;
+    if(m){ sum+=m; count++; }
+    // Background = energy level (purple→lavender)
+    cell.style.background = energyColor(e);
+    cell.title = `${d.dt.toDateString()} • Mood ${m||'-'} • Energy ${e||'-'}`;
+    // tiny day number in corner
+    const label=document.createElement('div'); label.className='day'; label.textContent=d.dt.getDate(); cell.appendChild(label);
+    // centered mood emoji overlay
+    if(m){ const emo=document.createElement('div'); emo.className='emo'; emo.textContent = EMOJI[m-1] || ''; cell.appendChild(emo); }
+  });
+  const stat = document.getElementById('moodCalStats'); stat.textContent = count? `avg ${(sum/count).toFixed(2)} • filled ${count}/30` : '—';
+}
+
+function renderTaskCalendar(){
+  const s=load(); const days=lastNDays(30);
+  let maxC=1; const counts=days.map(d=>{ const done=s.done[d.key]||{}; const c=Object.values(done).filter(Boolean).length; maxC=Math.max(maxC,c); return {d,c}; });
+  buildCalendar('taskCal', days, (cell, d)=>{
+    const c = (s.done[d.key]) ? Object.values(s.done[d.key]).filter(Boolean).length : 0;
+    const intensity = Math.min(1, c/(maxC||1));
+    const bgA = 0.12 + 0.38*intensity; // 0.12 .. 0.5
+    cell.style.background = `rgba(0,229,255,${bgA})`;
+    cell.style.borderColor = 'rgba(0,229,255,'+(0.25*intensity+0.1)+')';
+    // Top center day label: Tue 5
+    const abbr = d.dt.toLocaleDateString(undefined,{weekday:'short'});
+    const top=document.createElement('div'); top.className='topline'; top.textContent=`${abbr} ${d.dt.getDate()}`; cell.appendChild(top);
+    // Big centered count
+    const cnt=document.createElement('div'); cnt.className='count'; cnt.textContent=c; cell.appendChild(cnt);
+    cell.title = `${d.dt.toDateString()} • Tasks completed ${c}`;
+  });
+  const total = counts.reduce((a,b)=>a+b.c,0); document.getElementById('taskCalStats').textContent = `${total} done in 30d`;
+}
+
+// Daily roll: ensure new day keys exist
+(function dailyRoll(){
+  let last = todayKey();
+  setInterval(()=>{
+    const now = todayKey();
+    if(now!==last){
+      const s=load(); s.done[now] = s.done[now] || {}; save(s); last = now; renderTasks(); renderMoodCalendar(); renderTaskCalendar(); renderHeader();
+    }
+  }, 60*1000);
+})();
+
+// Init
+ensureState();
+renderHeader();
+renderMoodEnergy();
+renderTasks();
+renderMoodCalendar();
+renderTaskCalendar();
+showTab('mood');
+
+document.getElementById('saveBtn').onclick = saveToday;
+document.getElementById('addBtn').onclick = addTask;
+document.getElementById('spinBtn').onclick = spinTask;
+document.getElementById('shareBtn').onclick = shareTip;
+document.getElementById('wipeBtn').onclick = wipe;
+
+tabMoodBtn.onclick = ()=> showTab('mood');
+tabTasksBtn.onclick = ()=> showTab('tasks');
+
+// Register SW for offline
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+  });
+}
+</script>
+</body>
 </html>
